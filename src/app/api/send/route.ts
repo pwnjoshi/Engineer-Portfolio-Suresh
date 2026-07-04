@@ -3,10 +3,43 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key');
 
+// In-memory rate limiting map (IP -> timestamps array)
+const rateLimitMap = new Map<string, number[]>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute window
+const MAX_REQUESTS_PER_WINDOW = 3;   // Limit to 3 messages per minute per IP
+
 export async function POST(request: Request) {
   try {
-    const { name, email, message } = await request.json();
+    const { name, email, message, website } = await request.json();
 
+    // 1. Honeypot check: Bots usually autofill hidden fields like "website"
+    // Return a fake success status to trick the bot without executing any mail transfer
+    if (website) {
+      console.warn('Spam bot execution detected via honeypot.');
+      return NextResponse.json({ success: true, message: 'Message sent successfully.' });
+    }
+
+    // 2. Client IP Rate Limiting
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+    const now = Date.now();
+
+    if (ip !== 'unknown') {
+      const clientRequests = rateLimitMap.get(ip) || [];
+      // Remove requests outside the active sliding window
+      const activeRequests = clientRequests.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW);
+
+      if (activeRequests.length >= MAX_REQUESTS_PER_WINDOW) {
+        return NextResponse.json(
+          { success: false, error: 'Too many messages sent. Please wait 1 minute before trying again.' },
+          { status: 429 }
+        );
+      }
+
+      activeRequests.push(now);
+      rateLimitMap.set(ip, activeRequests);
+    }
+
+    // 3. Input Validation
     if (!name || !email || !message) {
       return NextResponse.json(
         { success: false, error: 'All fields (name, email, message) are required.' },
@@ -14,7 +47,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Default receiver is the sender's configured destination, fallback to onboarding@resend.dev
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { success: false, error: 'Please enter a valid email address.' },
+        { status: 400 }
+      );
+    }
+
     const toEmail = process.env.CONTACT_RECEIVER_EMAIL || 'onboarding@resend.dev';
 
     const data = await resend.emails.send({

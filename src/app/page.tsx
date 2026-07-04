@@ -15,7 +15,7 @@ const SKILLS = [
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sliderIndex, setSliderIndex] = useState(0);
-  const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+  const [formData, setFormData] = useState({ name: '', email: '', message: '', website: '' });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -58,7 +58,7 @@ export default function Home() {
         setTimeout(() => {
           setIsSubmitted(false);
           setIsModalOpen(false);
-          setFormData({ name: '', email: '', message: '' });
+          setFormData({ name: '', email: '', message: '', website: '' });
         }, 3000);
       } else {
         setSubmitError(resData.error || 'Something went wrong. Please try again.');
@@ -317,6 +317,17 @@ export default function Home() {
                   {submitError}
                 </div>
               )}
+
+              {/* Honeypot field (hidden from screen readers/humans, but auto-filled by bots) */}
+              <input
+                type="text"
+                name="website"
+                value={formData.website}
+                onChange={handleInputChange}
+                style={{ display: 'none' }}
+                tabIndex={-1}
+                autoComplete="off"
+              />
               
               <div className="form-group">
                 <label className="form-label" htmlFor="name">Name</label>
