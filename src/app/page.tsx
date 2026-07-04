@@ -17,6 +17,8 @@ export default function Home() {
   const [sliderIndex, setSliderIndex] = useState(0);
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   // Auto scroll for skills slider
   useEffect(() => {
@@ -39,15 +41,33 @@ export default function Home() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API request
-    setIsSubmitted(true);
-    setTimeout(() => {
-      setIsSubmitted(false);
-      setIsModalOpen(false);
-      setFormData({ name: '', email: '', message: '' });
-    }, 2000);
+    setIsSubmitting(true);
+    setSubmitError('');
+    try {
+      const response = await fetch('/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      const resData = await response.json();
+      if (resData.success) {
+        setIsSubmitted(true);
+        setTimeout(() => {
+          setIsSubmitted(false);
+          setIsModalOpen(false);
+          setFormData({ name: '', email: '', message: '' });
+        }, 3000);
+      } else {
+        setSubmitError(resData.error || 'Something went wrong. Please try again.');
+      }
+    } catch (error) {
+      setSubmitError('Failed to connect to the server. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -292,6 +312,12 @@ export default function Home() {
             </div>
           ) : (
             <form className="contact-form" onSubmit={handleSubmit}>
+              {submitError && (
+                <div style={{ color: '#D9383A', fontSize: '0.85rem', background: '#FDF2F2', padding: '0.8rem', borderRadius: '10px', border: '1px solid #F8D7DA' }}>
+                  {submitError}
+                </div>
+              )}
+              
               <div className="form-group">
                 <label className="form-label" htmlFor="name">Name</label>
                 <input 
@@ -302,6 +328,7 @@ export default function Home() {
                   value={formData.name} 
                   onChange={handleInputChange} 
                   required 
+                  disabled={isSubmitting}
                   placeholder="Your Name"
                 />
               </div>
@@ -316,6 +343,7 @@ export default function Home() {
                   value={formData.email} 
                   onChange={handleInputChange} 
                   required 
+                  disabled={isSubmitting}
                   placeholder="your.email@example.com"
                 />
               </div>
@@ -330,13 +358,19 @@ export default function Home() {
                   value={formData.message} 
                   onChange={handleInputChange} 
                   required
+                  disabled={isSubmitting}
                   placeholder="Tell me about your project or inquiry..."
                   style={{ resize: 'vertical' }}
                 />
               </div>
 
-              <button type="submit" className="btn-primary" style={{ marginTop: '0.5rem', width: '100%' }}>
-                Send Message
+              <button 
+                type="submit" 
+                className="btn-primary" 
+                style={{ marginTop: '0.5rem', width: '100%' }}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Sending...' : 'Send Message'}
               </button>
             </form>
           )}
